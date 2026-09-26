@@ -8,7 +8,8 @@ export const navItems = [
   { key: 'lanes', path: '/lanes', icon: '🎯', label: '箭道', hint: '靶场平面图，点道开台', badge: 'laneOpen', unit: '开放' },
   { key: 'score', path: '/score', icon: '🏹', label: '计分', hint: '环数键盘，一支一支记', badge: 'roundOngoing', unit: '进行中' },
   { key: 'courses', path: '/courses', icon: '📚', label: '课程', hint: '卡片列表，满员禁用报名', badge: 'courseTotal', unit: '门' },
-  { key: 'equipment', path: '/equipment', icon: '🧰', label: '器材', hint: '表格 + 租借归还', badge: 'equipRented', unit: '租出' }
+  { key: 'equipment', path: '/equipment', icon: '🧰', label: '器材', hint: '表格 + 租借归还', badge: 'equipRented', unit: '租出' },
+  { key: 'safety', path: '/safety', icon: '🛑', label: '安全联锁', hint: '停射事件 · 双人复核 · 复射放行', badge: 'safetyActive', unit: '在办' }
 ]
 
 export const memberItem = { key: 'members', path: '/members', icon: '🪪', label: '会员', hint: '开卡 / 充值 / 等级', badge: 'memberTotal', unit: '人' }
@@ -19,6 +20,7 @@ const routes = [
   { path: '/score', name: 'score', component: () => import('../views/ScoreView.vue') },
   { path: '/courses', name: 'courses', component: () => import('../views/CourseView.vue') },
   { path: '/equipment', name: 'equipment', component: () => import('../views/EquipmentView.vue') },
+  { path: '/safety', name: 'safety', component: () => import('../views/SafetyView.vue') },
   { path: '/members', name: 'members', component: () => import('../views/MemberView.vue') },
   { path: '/:pathMatch(.*)*', redirect: '/lanes' }
 ]

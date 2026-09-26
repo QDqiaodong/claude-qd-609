@@ -21,7 +21,7 @@
             :key="l.id"
             :label="`${l.laneNo} · ${l.distance}m · ${l.statusName}`"
             :value="l.id"
-            :disabled="l.status === 'MAINTENANCE'"
+            :disabled="l.status === 'MAINTENANCE' || l.status === 'LOCKED'"
           />
         </el-select>
         <el-radio-group v-model="startForm.arrowCount">
@@ -44,6 +44,10 @@
       <div class="desk">
         <!-- 左：键盘 -->
         <div class="keypad-box">
+          <div v-if="current && current.round.status === 'PAUSED'" class="pause-banner">
+            🛑 停射事件在办，本回合已暂停：已记录的 {{ current.arrows.length }} 支箭顺序与分数保留，
+            暂停期间不能记箭、撤销或提交，待复射放行后从原进度继续。
+          </div>
           <div class="keypad">
             <button
               v-for="ring in keypad.rings || []"
@@ -72,7 +76,7 @@
             <div class="live-head">
               <div>
                 <span class="live-no mono">{{ current.round.roundNo }}</span>
-                <el-tag size="small" :type="current.round.status === 'SUBMITTED' ? 'success' : 'warning'" effect="dark">
+                <el-tag size="small" :type="roundTagType(current.round.status)" effect="dark">
                   {{ current.round.statusName }}
                 </el-tag>
                 <el-tag v-if="current.round.personalBest" size="small" type="danger" effect="dark">个人最好成绩</el-tag>
@@ -156,7 +160,7 @@
         </el-table-column>
         <el-table-column label="状态" width="110">
           <template #default="{ row }">
-            <el-tag size="small" :type="row.status === 'SUBMITTED' ? 'success' : 'warning'" effect="plain">
+            <el-tag size="small" :type="roundTagType(row.status)" effect="plain">
               {{ row.statusName }}
             </el-tag>
           </template>
@@ -192,6 +196,12 @@ const canSubmit = computed(() =>
   !!current.value && current.value.round.status === 'ONGOING'
   && current.value.arrows.length === current.value.round.arrowCount
 )
+
+function roundTagType(status) {
+  if (status === 'SUBMITTED') return 'success'
+  if (status === 'PAUSED') return 'danger'
+  return 'warning'
+}
 
 const progressPercent = computed(() => {
   if (!current.value) return 0
@@ -362,6 +372,17 @@ onMounted(async () => {
 .keypad-hint {
   margin-top: 8px;
   line-height: 1.6;
+}
+
+.pause-banner {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #b3261e;
+  background: #fdeceb;
+  border-left: 3px solid #e57373;
+  border-radius: 4px;
 }
 
 /* ---------- 实时面板 ---------- */

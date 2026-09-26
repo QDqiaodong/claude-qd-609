@@ -17,11 +17,11 @@
       <div class="panel-title">
         靶场平面图
         <small>开放 <b class="c-open">{{ countOf('OPEN') }}</b> · 占用 <b class="c-busy">{{ countOf('OCCUPIED') }}</b> ·
-          维护 <b class="c-grey">{{ countOf('MAINTENANCE') }}</b></small>
+          维护 <b class="c-grey">{{ countOf('MAINTENANCE') }}</b> · 安全锁定 <b class="c-lock">{{ countOf('LOCKED') }}</b></small>
       </div>
 
       <div class="rule-tip">
-        绿色 = 开放，可点开台；深青 = 占用中，可点收台；灰色 = 维护中，禁止开台。开台按「单价 × 时长 × 会员折扣」预扣余额。
+        绿色 = 开放，可点开台；深青 = 占用中，可点收台；灰色 = 维护中，禁止开台；红色 = 安全锁定（停射事件在办），禁止一切操作，待复射放行后恢复原状态。开台按「单价 × 时长 × 会员折扣」预扣余额。
       </div>
 
       <div class="hall">
@@ -47,6 +47,7 @@
               <span class="strip-dist">{{ lane.distance }}m</span>
               <span class="strip-type">{{ lane.targetType }}</span>
               <span v-if="lane.status === 'OCCUPIED'" class="strip-who">{{ lane.occupantName || '占用中' }}</span>
+              <span v-if="lane.status === 'LOCKED'" class="strip-lock">🛑</span>
             </div>
 
             <div class="lane-foot">
@@ -64,6 +65,7 @@
         <span><i class="sw sw-open" />开放</span>
         <span><i class="sw sw-busy" />占用</span>
         <span><i class="sw sw-grey" />维护</span>
+        <span><i class="sw sw-lock" />安全锁定</span>
         <span class="muted">共 {{ lanes.length }} 条道</span>
       </div>
     </div>
@@ -165,6 +167,10 @@ async function loadMembers() {
 
 function pickLane(lane) {
   pickId.value = lane.id
+  if (lane.status === 'LOCKED') {
+    ElMessage.warning(`${lane.laneNo} 处于安全锁定（停射事件在办），不能开台或收台，待复射放行后恢复`)
+    return
+  }
   if (lane.status === 'OPEN') {
     openForm.memberId = members.value.length ? members.value[0].id : null
     openForm.hours = 2
@@ -383,6 +389,26 @@ onMounted(async () => {
   opacity: 0.85;
 }
 
+.lane.is-locked .strip {
+  background: repeating-linear-gradient(180deg, #fdeceb 0 12px, #fadcd9 12px 24px);
+  border-color: #e8a09a;
+}
+
+.lane.is-locked .lane-status {
+  background: #c62828;
+  color: #fff;
+}
+
+.lane.is-locked {
+  cursor: not-allowed;
+}
+
+.strip-lock {
+  position: absolute;
+  top: 6px;
+  font-size: 14px;
+}
+
 .legend {
   display: flex;
   align-items: center;
@@ -410,6 +436,14 @@ onMounted(async () => {
 
 .sw-grey {
   background: #b6bfc3;
+}
+
+.sw-lock {
+  background: #c62828;
+}
+
+.c-lock {
+  color: #c62828;
 }
 
 .c-open {

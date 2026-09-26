@@ -45,6 +45,10 @@ public class Equipment {
     @Column(name = "rented_at")
     private LocalDateTime rentedAt;
 
+    /** 安全联锁：非空表示被该停射事件锁定（此时 status 为 LOCKED，原状态存于事件快照） */
+    @Column(name = "lock_event_id")
+    private Long lockEventId;
+
     public Long getId() {
         return id;
     }
@@ -115,5 +119,13 @@ public class Equipment {
 
     public void setRentedAt(LocalDateTime rentedAt) {
         this.rentedAt = rentedAt;
+    }
+
+    public Long getLockEventId() {
+        return lockEventId;
+    }
+
+    public void setLockEventId(Long lockEventId) {
+        this.lockEventId = lockEventId;
     }
 }

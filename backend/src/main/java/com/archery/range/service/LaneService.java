@@ -65,10 +65,14 @@ public class LaneService {
 
     /**
      * 开台：只有「开放」的箭道能开台，按 单价 × 时长 × 会员折扣 预扣余额。
+     * 安全联锁：LOCKED 的箭道（停射事件在办）禁止开台。
      */
     @Transactional
     public LaneDtos.LaneView open(Long id, LaneDtos.LaneOpenReq req) {
         Lane lane = require(id);
+        if ("LOCKED".equals(lane.getStatus())) {
+            throw new BizException("箭道 [" + lane.getLaneNo() + "] 处于安全锁定（停射事件在办），不能开台");
+        }
         if (!"OPEN".equals(lane.getStatus())) {
             throw new BizException("箭道 [" + lane.getLaneNo() + "] 当前为「"
                     + RangeDict.laneStatusName(lane.getStatus()) + "」，不能开台");
@@ -91,10 +95,13 @@ public class LaneService {
         return toView(laneRepository.save(lane));
     }
 
-    /** 收台：把占用中的箭道放回开放。 */
+    /** 收台：把占用中的箭道放回开放。安全锁定中的箭道不能收台。 */
     @Transactional
     public LaneDtos.LaneView release(Long id) {
         Lane lane = require(id);
+        if ("LOCKED".equals(lane.getStatus())) {
+            throw new BizException("箭道 [" + lane.getLaneNo() + "] 处于安全锁定（停射事件在办），不能收台");
+        }
         if (!"OCCUPIED".equals(lane.getStatus())) {
             throw new BizException("箭道 [" + lane.getLaneNo() + "] 当前无人占用，无需收台");
         }
@@ -106,10 +113,13 @@ public class LaneService {
         return toView(laneRepository.save(lane));
     }
 
-    /** 状态切换：开放 → 维护（保养）；维护 → 开放（修好）。占用中不允许改维护。 */
+    /** 状态切换：开放 → 维护（保养）；维护 → 开放（修好）。占用中不允许改维护；安全锁定中禁止手工切换。 */
     @Transactional
     public LaneDtos.LaneView setStatus(Long id, String status) {
         Lane lane = require(id);
+        if ("LOCKED".equals(lane.getStatus())) {
+            throw new BizException("箭道 [" + lane.getLaneNo() + "] 处于安全锁定（停射事件在办），不能手工切换状态");
+        }
         if (!"OPEN".equals(status) && !"MAINTENANCE".equals(status)) {
             throw new BizException("只能手工切换到「开放」或「维护」状态");
         }
@@ -147,6 +157,7 @@ public class LaneService {
                 lane.getOccupantId(),
                 lane.getOccupantName(),
                 lane.getOpenedAt(),
-                lane.getPlannedHours());
+                lane.getPlannedHours(),
+                lane.getLockEventId());
     }
 }

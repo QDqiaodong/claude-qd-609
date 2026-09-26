@@ -49,6 +49,10 @@ public class Lane {
     @Column(name = "planned_hours")
     private Integer plannedHours;
 
+    /** 安全联锁：非空表示被该停射事件锁定（此时 status 为 LOCKED，原状态存于事件快照） */
+    @Column(name = "lock_event_id")
+    private Long lockEventId;
+
     public Long getId() {
         return id;
     }
@@ -127,5 +131,13 @@ public class Lane {
 
     public void setPlannedHours(Integer plannedHours) {
         this.plannedHours = plannedHours;
+    }
+
+    public Long getLockEventId() {
+        return lockEventId;
+    }
+
+    public void setLockEventId(Long lockEventId) {
+        this.lockEventId = lockEventId;
     }
 }

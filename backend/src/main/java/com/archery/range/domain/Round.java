@@ -62,9 +62,13 @@ public class Round {
     @Column(name = "personal_best", nullable = false)
     private Boolean personalBest;
 
-    /** ONGOING 进行中 / SUBMITTED 已提交 */
+    /** ONGOING 进行中 / PAUSED 暂停（安全联锁） / SUBMITTED 已提交 */
     @Column(nullable = false, length = 16)
     private String status;
+
+    /** 安全联锁：非空表示被该停射事件暂停（此时 status 为 PAUSED） */
+    @Column(name = "lock_event_id")
+    private Long lockEventId;
 
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinTable(
@@ -152,6 +156,14 @@ public class Round {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public Long getLockEventId() {
+        return lockEventId;
+    }
+
+    public void setLockEventId(Long lockEventId) {
+        this.lockEventId = lockEventId;
     }
 
     public List<ArrowScore> getArrows() {

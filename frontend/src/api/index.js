@@ -74,6 +74,17 @@ export const equipApi = {
   options: () => http.get('/equipment/options')
 }
 
+/** 模块六：安全停射联锁台（事件 → 双人分项复核 → 复射放行） */
+export const safetyApi = {
+  list: (params) => http.get('/safety/events', { params }),
+  detail: (id) => http.get(`/safety/events/${id}`),
+  create: (data) => http.post('/safety/events', data),
+  advance: (id, data) => http.post(`/safety/events/${id}/advance`, data),
+  review: (id, data) => http.post(`/safety/events/${id}/reviews`, data),
+  release: (id, data) => http.post(`/safety/events/${id}/release`, data),
+  options: () => http.get('/safety/options')
+}
+
 export const statsApi = {
   board: () => http.get('/stats/board')
 }

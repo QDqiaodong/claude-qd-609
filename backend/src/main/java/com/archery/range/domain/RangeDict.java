@@ -19,7 +19,8 @@ public final class RangeDict {
     private static final Map<String, String> LANE_STATUS = Map.of(
             "OPEN", "开放",
             "OCCUPIED", "占用",
-            "MAINTENANCE", "维护");
+            "MAINTENANCE", "维护",
+            "LOCKED", "安全锁定");
 
     /** 开台单次时长上限（小时） */
     public static final int MAX_OPEN_HOURS = 8;
@@ -91,12 +92,50 @@ public final class RangeDict {
     private static final Map<String, String> EQUIP_STATUS = Map.of(
             "INSTOCK", "在库",
             "RENTED", "租出",
-            "REPAIR", "维修");
+            "REPAIR", "维修",
+            "LOCKED", "安全锁定");
 
     // ---------------- 回合状态 ----------------
     private static final Map<String, String> ROUND_STATUS = Map.of(
             "ONGOING", "进行中",
+            "PAUSED", "暂停中",
             "SUBMITTED", "已提交");
+
+    // ---------------- 停射联锁事件 ----------------
+    /** 事件触发类型 */
+    private static final Map<String, String> EVENT_TYPE = Map.of(
+            "LANE_FAULT", "箭道设备异常",
+            "INTRUSION", "人员闯入射线",
+            "EQUIP_FAULT", "疑似器材故障",
+            "OTHER", "其他安全隐患");
+
+    /** 严重级别 */
+    private static final Map<String, String> EVENT_SEVERITY = Map.of(
+            "LOW", "一般",
+            "MEDIUM", "较重",
+            "HIGH", "紧急");
+
+    /** 事件状态：待处置 → 分项复核 → 已放行 */
+    private static final Map<String, String> EVENT_STATUS = Map.of(
+            "PENDING", "待处置",
+            "REVIEWING", "分项复核",
+            "RELEASED", "已放行");
+
+    /** 分项复核项：教练确认射线与人员安全 / 器材管理员确认器材已检查 */
+    private static final Map<String, String> REVIEW_TYPE = Map.of(
+            "COACH", "教练复核",
+            "KEEPER", "器材管理员复核");
+
+    /** 复核结论 */
+    private static final Map<String, String> REVIEW_CONCLUSION = Map.of(
+            "PASS", "通过",
+            "REJECT", "不通过");
+
+    /** 联锁台角色 */
+    private static final Map<String, String> SAFETY_ROLE = Map.of(
+            "MANAGER", "值班经理",
+            "COACH", "教练",
+            "KEEPER", "器材管理员");
 
     // ---------------- 取值方法 ----------------
 
@@ -187,5 +226,55 @@ public final class RangeDict {
 
     public static String roundStatusName(String status) {
         return status == null ? "" : ROUND_STATUS.getOrDefault(status, status);
+    }
+
+    // ---------------- 停射联锁取值方法 ----------------
+
+    public static boolean isValidEventType(String type) {
+        return type != null && EVENT_TYPE.containsKey(type);
+    }
+
+    public static String eventTypeName(String type) {
+        return type == null ? "" : EVENT_TYPE.getOrDefault(type, type);
+    }
+
+    public static boolean isValidEventSeverity(String severity) {
+        return severity != null && EVENT_SEVERITY.containsKey(severity);
+    }
+
+    public static String eventSeverityName(String severity) {
+        return severity == null ? "" : EVENT_SEVERITY.getOrDefault(severity, severity);
+    }
+
+    public static boolean isValidEventStatus(String status) {
+        return status != null && EVENT_STATUS.containsKey(status);
+    }
+
+    public static String eventStatusName(String status) {
+        return status == null ? "" : EVENT_STATUS.getOrDefault(status, status);
+    }
+
+    public static boolean isValidReviewType(String type) {
+        return type != null && REVIEW_TYPE.containsKey(type);
+    }
+
+    public static String reviewTypeName(String type) {
+        return type == null ? "" : REVIEW_TYPE.getOrDefault(type, type);
+    }
+
+    public static boolean isValidConclusion(String conclusion) {
+        return conclusion != null && REVIEW_CONCLUSION.containsKey(conclusion);
+    }
+
+    public static String conclusionName(String conclusion) {
+        return conclusion == null ? "" : REVIEW_CONCLUSION.getOrDefault(conclusion, conclusion);
+    }
+
+    public static boolean isValidSafetyRole(String role) {
+        return role != null && SAFETY_ROLE.containsKey(role);
+    }
+
+    public static String safetyRoleName(String role) {
+        return role == null ? "" : SAFETY_ROLE.getOrDefault(role, role);
     }
 }

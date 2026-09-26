@@ -15,6 +15,7 @@
 
     <div class="rule-tip">
       只有「在库」器材可租借，租借按 1 小时租金从会员余额扣；「租出」可归还；「维修」中的器材不能租借，修好后回到在库。
+      「安全锁定」表示器材被停射事件冻结，不能租借、归还或切换维修状态，待复射放行后恢复至锁定前状态。
     </div>
 
     <div class="panel">
@@ -44,9 +45,12 @@
           <template #default="{ row }">
             <el-button link type="primary" :disabled="row.status !== 'INSTOCK'" @click="openRent(row)">租借</el-button>
             <el-button link type="success" :disabled="row.status !== 'RENTED'" @click="giveBack(row)">归还</el-button>
-            <el-button link type="warning" :disabled="row.status === 'RENTED'" @click="repair(row)">
+            <el-button link type="warning" :disabled="row.status === 'RENTED' || row.status === 'LOCKED'" @click="repair(row)">
               {{ row.status === 'REPAIR' ? '修好' : '报修' }}
             </el-button>
+            <el-tooltip v-if="row.status === 'LOCKED'" content="停射事件在办，待复射放行后恢复">
+              <el-tag size="small" type="danger" effect="plain">🛑 联锁</el-tag>
+            </el-tooltip>
           </template>
         </el-table-column>
       </el-table>
@@ -116,6 +120,7 @@ const createForm = reactive({ equipCode: '', type: 'RECURVE', brand: '', rentPri
 function statusType(status) {
   if (status === 'INSTOCK') return 'success'
   if (status === 'RENTED') return 'primary'
+  if (status === 'LOCKED') return 'danger'
   return 'info'
 }
 

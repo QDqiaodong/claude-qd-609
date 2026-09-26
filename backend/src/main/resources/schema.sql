@@ -8,14 +8,16 @@ CREATE TABLE IF NOT EXISTS lanes (
   lane_no       VARCHAR(16)  NOT NULL COMMENT '道号',
   distance      INT          NOT NULL COMMENT '距离（米）：10/18/30/50',
   target_type   VARCHAR(32)  NOT NULL COMMENT '箭靶类型',
-  status        VARCHAR(16)  NOT NULL COMMENT 'OPEN 开放 / OCCUPIED 占用 / MAINTENANCE 维护',
+  status        VARCHAR(16)  NOT NULL COMMENT 'OPEN 开放 / OCCUPIED 占用 / MAINTENANCE 维护 / LOCKED 安全锁定',
   hourly_price  DECIMAL(10,2) NOT NULL COMMENT '每小时单价',
   occupant_id   BIGINT       NULL COMMENT '占用会员',
   occupant_name VARCHAR(32)  NULL,
   opened_at     DATETIME     NULL COMMENT '开台时间',
   planned_hours INT          NULL COMMENT '预计时长（小时）',
+  lock_event_id BIGINT       NULL COMMENT '安全联锁：非空 = 被该停射事件锁定',
   PRIMARY KEY (id),
-  UNIQUE KEY uk_lane_no (lane_no)
+  UNIQUE KEY uk_lane_no (lane_no),
+  KEY idx_lane_lock (lock_event_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS members (
@@ -42,11 +44,13 @@ CREATE TABLE IF NOT EXISTS rounds (
   total_score   INT          NOT NULL COMMENT '总分',
   average_score DECIMAL(5,2) NOT NULL COMMENT '平均环',
   personal_best TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '是否个人最好成绩',
-  status        VARCHAR(16)  NOT NULL COMMENT 'ONGOING 进行中 / SUBMITTED 已提交',
+  status        VARCHAR(16)  NOT NULL COMMENT 'ONGOING 进行中 / PAUSED 暂停（安全联锁） / SUBMITTED 已提交',
+  lock_event_id BIGINT       NULL COMMENT '安全联锁：非空 = 被该停射事件暂停',
   PRIMARY KEY (id),
   UNIQUE KEY uk_round_no (round_no),
   KEY idx_round_member (member_id),
   KEY idx_round_lane (lane_id),
+  KEY idx_round_lock (lock_event_id),
   CONSTRAINT fk_round_member FOREIGN KEY (member_id) REFERENCES members (id),
   CONSTRAINT fk_round_lane   FOREIGN KEY (lane_id)   REFERENCES lanes (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -100,12 +104,108 @@ CREATE TABLE IF NOT EXISTS equipment (
   type        VARCHAR(16)  NOT NULL COMMENT 'RECURVE 反曲弓 / COMPOUND 复合弓 / TRADITIONAL 传统弓 / GEAR 护具 / ARROW 箭支',
   brand       VARCHAR(32)  NOT NULL COMMENT '品牌',
   rent_price  DECIMAL(10,2) NOT NULL COMMENT '租金（元/小时）',
-  status      VARCHAR(16)  NOT NULL COMMENT 'INSTOCK 在库 / RENTED 租出 / REPAIR 维修',
+  status      VARCHAR(16)  NOT NULL COMMENT 'INSTOCK 在库 / RENTED 租出 / REPAIR 维修 / LOCKED 安全锁定',
   renter_id   BIGINT       NULL,
   renter_name VARCHAR(32)  NULL,
   rented_at   DATETIME     NULL COMMENT '租出时间',
+  lock_event_id BIGINT     NULL COMMENT '安全联锁：非空 = 被该停射事件锁定',
   PRIMARY KEY (id),
-  UNIQUE KEY uk_equip_code (equip_code)
+  UNIQUE KEY uk_equip_code (equip_code),
+  KEY idx_equip_lock (lock_event_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ================= 安全停射联锁台 =================
+
+-- 停射事件：待处置 → 分项复核 → 已放行
+CREATE TABLE IF NOT EXISTS safety_event (
+  id          BIGINT       NOT NULL AUTO_INCREMENT,
+  event_no    VARCHAR(24)  NOT NULL COMMENT '事件编号',
+  event_type  VARCHAR(16)  NOT NULL COMMENT 'LANE_FAULT 箭道设备异常 / INTRUSION 人员闯入射线 / EQUIP_FAULT 疑似器材故障 / OTHER 其他',
+  severity    VARCHAR(16)  NOT NULL COMMENT 'LOW 一般 / MEDIUM 较重 / HIGH 紧急',
+  reason      VARCHAR(128) NOT NULL COMMENT '停射原因',
+  description VARCHAR(512) NOT NULL COMMENT '现场说明',
+  status      VARCHAR(16)  NOT NULL COMMENT 'PENDING 待处置 / REVIEWING 分项复核 / RELEASED 已放行',
+  created_by  VARCHAR(32)  NOT NULL COMMENT '创建人（值班经理）',
+  created_at  DATETIME     NOT NULL,
+  released_by VARCHAR(32)  NULL COMMENT '放行执行人（值班经理）',
+  released_at DATETIME     NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_event_no (event_no)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 事件-箭道快照：锁定前业务状态，放行时按此恢复
+CREATE TABLE IF NOT EXISTS safety_event_lane (
+  id          BIGINT      NOT NULL AUTO_INCREMENT,
+  event_id    BIGINT      NOT NULL,
+  lane_id     BIGINT      NOT NULL,
+  lane_no     VARCHAR(16) NOT NULL,
+  prev_status VARCHAR(16) NOT NULL COMMENT '锁定前状态：OPEN / OCCUPIED / MAINTENANCE',
+  restored    TINYINT(1)  NOT NULL DEFAULT 0 COMMENT '放行恢复后置 1',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_event_lane (event_id, lane_id),
+  CONSTRAINT fk_sel_event FOREIGN KEY (event_id) REFERENCES safety_event (id),
+  CONSTRAINT fk_sel_lane   FOREIGN KEY (lane_id)  REFERENCES lanes (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 事件-器材快照：锁定前状态与租借人，放行时按此恢复（租出的仍归原会员）
+CREATE TABLE IF NOT EXISTS safety_event_equipment (
+  id               BIGINT      NOT NULL AUTO_INCREMENT,
+  event_id         BIGINT      NOT NULL,
+  equipment_id     BIGINT      NOT NULL,
+  equip_code       VARCHAR(24) NOT NULL,
+  prev_status      VARCHAR(16) NOT NULL COMMENT '锁定前状态：INSTOCK / RENTED / REPAIR',
+  prev_renter_id   BIGINT      NULL,
+  prev_renter_name VARCHAR(32) NULL,
+  prev_rented_at   DATETIME    NULL,
+  restored         TINYINT(1)  NOT NULL DEFAULT 0,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_event_equip (event_id, equipment_id),
+  CONSTRAINT fk_see_event FOREIGN KEY (event_id)     REFERENCES safety_event (id),
+  CONSTRAINT fk_see_equip FOREIGN KEY (equipment_id) REFERENCES equipment (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 事件-回合快照：被暂停的进行中回合（箭支与分数不动，放行后从原进度继续）
+CREATE TABLE IF NOT EXISTS safety_event_round (
+  id          BIGINT      NOT NULL AUTO_INCREMENT,
+  event_id    BIGINT      NOT NULL,
+  round_id    BIGINT      NOT NULL,
+  round_no    VARCHAR(24) NOT NULL,
+  prev_status VARCHAR(16) NOT NULL COMMENT '暂停前状态：ONGOING',
+  restored    TINYINT(1)  NOT NULL DEFAULT 0,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_event_round (event_id, round_id),
+  CONSTRAINT fk_ser_event FOREIGN KEY (event_id) REFERENCES safety_event (id),
+  CONSTRAINT fk_ser_round FOREIGN KEY (round_id) REFERENCES rounds (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 分项复核：每个事件的每个复核项只有一份最终结论（唯一约束兜底并发）
+CREATE TABLE IF NOT EXISTS safety_review (
+  id            BIGINT      NOT NULL AUTO_INCREMENT,
+  event_id      BIGINT      NOT NULL,
+  review_type   VARCHAR(16) NOT NULL COMMENT 'COACH 教练复核 / KEEPER 器材管理员复核',
+  conclusion    VARCHAR(8)  NOT NULL COMMENT 'PASS 通过 / REJECT 不通过',
+  reviewer_name VARCHAR(32) NOT NULL COMMENT '复核人',
+  note          VARCHAR(256) NULL COMMENT '复核说明，不通过时必填',
+  reviewed_at   DATETIME    NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_event_review (event_id, review_type),
+  CONSTRAINT fk_review_event FOREIGN KEY (event_id) REFERENCES safety_event (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 事件状态轨迹：创建 / 转入复核 / 每项复核结论 / 复射放行
+CREATE TABLE IF NOT EXISTS safety_event_log (
+  id            BIGINT      NOT NULL AUTO_INCREMENT,
+  event_id      BIGINT      NOT NULL,
+  action        VARCHAR(24) NOT NULL COMMENT 'CREATE / ADVANCE / REVIEW_COACH / REVIEW_KEEPER / RELEASE',
+  from_status   VARCHAR(16) NULL,
+  to_status     VARCHAR(16) NULL,
+  operator_name VARCHAR(32) NOT NULL,
+  operator_role VARCHAR(16) NOT NULL COMMENT 'MANAGER 值班经理 / COACH 教练 / KEEPER 器材管理员',
+  detail        VARCHAR(256) NULL,
+  created_at    DATETIME    NOT NULL,
+  PRIMARY KEY (id),
+  KEY idx_log_event (event_id),
+  CONSTRAINT fk_log_event FOREIGN KEY (event_id) REFERENCES safety_event (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- lanes：12 行

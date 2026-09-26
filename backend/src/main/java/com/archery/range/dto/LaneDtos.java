@@ -39,6 +39,7 @@ public final class LaneDtos {
             Long occupantId,
             String occupantName,
             LocalDateTime openedAt,
-            Integer plannedHours) {
+            Integer plannedHours,
+            Long lockEventId) {
     }
 }

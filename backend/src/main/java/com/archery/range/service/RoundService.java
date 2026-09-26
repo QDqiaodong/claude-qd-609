@@ -71,6 +71,9 @@ public class RoundService {
                 .orElseThrow(() -> new BizException("会员不存在：id=" + req.memberId()));
         Lane lane = laneRepository.findById(req.laneId())
                 .orElseThrow(() -> new BizException("箭道不存在：id=" + req.laneId()));
+        if ("LOCKED".equals(lane.getStatus())) {
+            throw new BizException("箭道 [" + lane.getLaneNo() + "] 处于安全锁定（停射事件在办），不能开始新回合");
+        }
         if ("MAINTENANCE".equals(lane.getStatus())) {
             throw new BizException("箭道 [" + lane.getLaneNo() + "] 维护中，不能开打");
         }
@@ -104,13 +107,12 @@ public class RoundService {
 
     /**
      * 记一支箭：append 到有序集合尾部，再重算总分与平均环。
+     * 安全联锁：PAUSED（停射事件在办）的回合禁止记箭，已记录的箭支顺序与分数保留。
      */
     @Transactional
     public RoundDtos.RoundDetailView shoot(Long id, RoundDtos.ShotReq req) {
         Round round = require(id);
-        if ("SUBMITTED".equals(round.getStatus())) {
-            throw new BizException("回合 [" + round.getRoundNo() + "] 已提交，不能再记箭");
-        }
+        requireOngoing(round, "记箭");
         if (round.getArrows().size() >= round.getArrowCount()) {
             throw new BizException("本组 " + round.getArrowCount() + " 支箭已打满，请先提交回合");
         }
@@ -123,13 +125,11 @@ public class RoundService {
         return toDetail(roundRepository.save(round));
     }
 
-    /** 撤销最后一支箭（打错环数时回滚一支）。 */
+    /** 撤销最后一支箭（打错环数时回滚一支）。暂停中的回合不能撤销。 */
     @Transactional
     public RoundDtos.RoundDetailView undo(Long id) {
         Round round = require(id);
-        if ("SUBMITTED".equals(round.getStatus())) {
-            throw new BizException("回合已提交，不能撤销");
-        }
+        requireOngoing(round, "撤销");
         if (round.getArrows().isEmpty()) {
             throw new BizException("本回合还没有记箭，无需撤销");
         }
@@ -139,14 +139,12 @@ public class RoundService {
     }
 
     /**
-     * 提交回合：必须打满一组，提交时判定是否个人最好成绩。
+     * 提交回合：必须打满一组，提交时判定是否个人最好成绩。暂停中的回合不能提交。
      */
     @Transactional
     public RoundDtos.RoundDetailView submit(Long id) {
         Round round = require(id);
-        if ("SUBMITTED".equals(round.getStatus())) {
-            throw new BizException("回合已提交");
-        }
+        requireOngoing(round, "提交");
         if (round.getArrows().size() < round.getArrowCount()) {
             throw new BizException("还差 " + (round.getArrowCount() - round.getArrows().size()) + " 支箭未打完，不能提交");
         }
@@ -166,6 +164,17 @@ public class RoundService {
     public Round require(Long id) {
         return roundRepository.findById(id)
                 .orElseThrow(() -> new BizException("回合不存在：id=" + id));
+    }
+
+    /** 只有进行中的回合能记箭 / 撤销 / 提交；暂停（安全联锁）与已提交都拦下 */
+    private static void requireOngoing(Round round, String action) {
+        if ("PAUSED".equals(round.getStatus())) {
+            throw new BizException("回合 [" + round.getRoundNo() + "] 因停射事件暂停中，不能" + action
+                    + "，已记录的箭支顺序与分数保留，待复射放行后继续");
+        }
+        if ("SUBMITTED".equals(round.getStatus())) {
+            throw new BizException("回合 [" + round.getRoundNo() + "] 已提交，不能" + action);
+        }
     }
 
     private void recalculate(Round round) {
@@ -206,7 +215,8 @@ public class RoundService {
                 round.getAverageScore(),
                 round.getPersonalBest(),
                 round.getStatus(),
-                RangeDict.roundStatusName(round.getStatus()));
+                RangeDict.roundStatusName(round.getStatus()),
+                round.getLockEventId());
     }
 
     private RoundDtos.RoundDetailView toDetail(Round round) {

@@ -17,6 +17,7 @@ import com.archery.range.repository.EquipmentRepository;
 import com.archery.range.repository.LaneRepository;
 import com.archery.range.repository.MemberRepository;
 import com.archery.range.repository.RoundRepository;
+import com.archery.range.repository.SafetyEventRepository;
 
 /**
  * 看板：各模块计数器 + 成绩榜。全部走派生查询，结果在内存里排序取值。
@@ -30,6 +31,7 @@ public class StatsService {
     private final ArrowScoreRepository arrowScoreRepository;
     private final CourseRepository courseRepository;
     private final EquipmentRepository equipmentRepository;
+    private final SafetyEventRepository safetyEventRepository;
     private final RoundService roundService;
 
     public StatsService(LaneRepository laneRepository,
@@ -38,6 +40,7 @@ public class StatsService {
             ArrowScoreRepository arrowScoreRepository,
             CourseRepository courseRepository,
             EquipmentRepository equipmentRepository,
+            SafetyEventRepository safetyEventRepository,
             RoundService roundService) {
         this.laneRepository = laneRepository;
         this.memberRepository = memberRepository;
@@ -45,6 +48,7 @@ public class StatsService {
         this.arrowScoreRepository = arrowScoreRepository;
         this.courseRepository = courseRepository;
         this.equipmentRepository = equipmentRepository;
+        this.safetyEventRepository = safetyEventRepository;
         this.roundService = roundService;
     }
 
@@ -56,14 +60,17 @@ public class StatsService {
         counters.put("laneOpen", lanes.stream().filter(lane -> "OPEN".equals(lane.getStatus())).count());
         counters.put("laneOccupied", lanes.stream().filter(lane -> "OCCUPIED".equals(lane.getStatus())).count());
         counters.put("laneMaintenance", lanes.stream().filter(lane -> "MAINTENANCE".equals(lane.getStatus())).count());
+        counters.put("laneLocked", lanes.stream().filter(lane -> "LOCKED".equals(lane.getStatus())).count());
         counters.put("memberTotal", memberRepository.count());
         counters.put("roundTotal", roundRepository.count());
         counters.put("roundOngoing", roundRepository.countByStatus("ONGOING"));
+        counters.put("roundPaused", roundRepository.countByStatus("PAUSED"));
         counters.put("arrowTotal", arrowScoreRepository.count());
         counters.put("xCount", arrowScoreRepository.countByRing("X"));
         counters.put("courseTotal", courseRepository.count());
         counters.put("equipTotal", equipmentRepository.count());
         counters.put("equipRented", equipmentRepository.findByStatusOrderByEquipCodeAsc("RENTED").size());
+        counters.put("safetyActive", safetyEventRepository.countByStatusNot("RELEASED"));
 
         List<RoundDtos.RoundView> top = roundRepository.findByStatusOrderByStartTimeDesc("SUBMITTED").stream()
                 .sorted(Comparator.comparingInt((com.archery.range.domain.Round r) ->
@@ -98,6 +105,7 @@ public class StatsService {
                 round.getAverageScore(),
                 round.getPersonalBest(),
                 round.getStatus(),
-                RangeDict.roundStatusName(round.getStatus()));
+                RangeDict.roundStatusName(round.getStatus()),
+                round.getLockEventId());
     }
 }

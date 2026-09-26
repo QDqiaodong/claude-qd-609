@@ -36,6 +36,7 @@ public final class EquipmentDtos {
             String statusName,
             Long renterId,
             String renterName,
-            LocalDateTime rentedAt) {
+            LocalDateTime rentedAt,
+            Long lockEventId) {
     }
 }

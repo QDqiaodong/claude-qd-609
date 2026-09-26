@@ -58,10 +58,13 @@ public class EquipmentService {
         return toView(equipmentRepository.save(equipment));
     }
 
-    /** 租借：只在库器材可租，按 1 小时租金从会员余额扣。 */
+    /** 租借：只在库器材可租，按 1 小时租金从会员余额扣。安全锁定的器材不能租借。 */
     @Transactional
     public EquipmentDtos.EquipmentView rent(Long id, EquipmentDtos.RentReq req) {
         Equipment equipment = require(id);
+        if ("LOCKED".equals(equipment.getStatus())) {
+            throw new BizException("器材 [" + equipment.getEquipCode() + "] 处于安全锁定（停射事件在办），不能租借");
+        }
         if (!"INSTOCK".equals(equipment.getStatus())) {
             throw new BizException("器材 [" + equipment.getEquipCode() + "] 当前为「"
                     + RangeDict.equipStatusName(equipment.getStatus()) + "」，不能租借");
@@ -76,10 +79,13 @@ public class EquipmentService {
         return toView(equipmentRepository.save(equipment));
     }
 
-    /** 归还：只有租出的器材能还。 */
+    /** 归还：只有租出的器材能还。安全锁定的器材不能归还。 */
     @Transactional
     public EquipmentDtos.EquipmentView giveBack(Long id) {
         Equipment equipment = require(id);
+        if ("LOCKED".equals(equipment.getStatus())) {
+            throw new BizException("器材 [" + equipment.getEquipCode() + "] 处于安全锁定（停射事件在办），不能归还");
+        }
         if (!"RENTED".equals(equipment.getStatus())) {
             throw new BizException("器材 [" + equipment.getEquipCode() + "] 未处于租出状态，无需归还");
         }
@@ -90,10 +96,13 @@ public class EquipmentService {
         return toView(equipmentRepository.save(equipment));
     }
 
-    /** 报修 / 修好：在库 → 维修，维修 → 在库。 */
+    /** 报修 / 修好：在库 → 维修，维修 → 在库。安全锁定的器材不能切换维修状态。 */
     @Transactional
     public EquipmentDtos.EquipmentView toggleRepair(Long id) {
         Equipment equipment = require(id);
+        if ("LOCKED".equals(equipment.getStatus())) {
+            throw new BizException("器材 [" + equipment.getEquipCode() + "] 处于安全锁定（停射事件在办），不能切换维修状态");
+        }
         if ("RENTED".equals(equipment.getStatus())) {
             throw new BizException("器材 [" + equipment.getEquipCode() + "] 租出中，请先归还再报修");
         }
@@ -127,6 +136,7 @@ public class EquipmentService {
                 RangeDict.equipStatusName(equipment.getStatus()),
                 equipment.getRenterId(),
                 equipment.getRenterName(),
-                equipment.getRentedAt());
+                equipment.getRentedAt(),
+                equipment.getLockEventId());
     }
 }

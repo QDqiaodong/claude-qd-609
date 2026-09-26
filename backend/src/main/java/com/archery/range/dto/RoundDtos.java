@@ -47,7 +47,8 @@ public final class RoundDtos {
             BigDecimal averageScore,
             Boolean personalBest,
             String status,
-            String statusName) {
+            String statusName,
+            Long lockEventId) {
     }
 
     /** 成绩单：回合 + 按 shot_index 顺序排好的每一支箭 */
