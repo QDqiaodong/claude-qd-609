@@ -69,8 +69,11 @@ public class RoundService {
     public RoundDtos.RoundDetailView start(RoundDtos.RoundStartReq req) {
         Member member = memberRepository.findById(req.memberId())
                 .orElseThrow(() -> new BizException("会员不存在：id=" + req.memberId()));
-        Lane lane = laneRepository.findById(req.laneId())
+        Lane lane = laneRepository.findByIdForUpdate(req.laneId())
                 .orElseThrow(() -> new BizException("箭道不存在：id=" + req.laneId()));
+        if ("LOCKED".equals(lane.getStatus())) {
+            throw new BizException("箭道 [" + lane.getLaneNo() + "] 处于安全锁定（停射事件未放行），不能开打");
+        }
         if ("MAINTENANCE".equals(lane.getStatus())) {
             throw new BizException("箭道 [" + lane.getLaneNo() + "] 维护中，不能开打");
         }
@@ -104,10 +107,12 @@ public class RoundService {
 
     /**
      * 记一支箭：append 到有序集合尾部，再重算总分与平均环。
+     * 暂停态（安全联锁）禁止记箭，已记录箭支的顺序与分数原样保留。
      */
     @Transactional
     public RoundDtos.RoundDetailView shoot(Long id, RoundDtos.ShotReq req) {
-        Round round = require(id);
+        Round round = requireForUpdate(id);
+        rejectIfPaused(round, "记箭");
         if ("SUBMITTED".equals(round.getStatus())) {
             throw new BizException("回合 [" + round.getRoundNo() + "] 已提交，不能再记箭");
         }
@@ -123,10 +128,11 @@ public class RoundService {
         return toDetail(roundRepository.save(round));
     }
 
-    /** 撤销最后一支箭（打错环数时回滚一支）。 */
+    /** 撤销最后一支箭（打错环数时回滚一支）。暂停态禁止撤销。 */
     @Transactional
     public RoundDtos.RoundDetailView undo(Long id) {
-        Round round = require(id);
+        Round round = requireForUpdate(id);
+        rejectIfPaused(round, "撤销");
         if ("SUBMITTED".equals(round.getStatus())) {
             throw new BizException("回合已提交，不能撤销");
         }
@@ -139,11 +145,12 @@ public class RoundService {
     }
 
     /**
-     * 提交回合：必须打满一组，提交时判定是否个人最好成绩。
+     * 提交回合：必须打满一组，提交时判定是否个人最好成绩。暂停态禁止提交。
      */
     @Transactional
     public RoundDtos.RoundDetailView submit(Long id) {
-        Round round = require(id);
+        Round round = requireForUpdate(id);
+        rejectIfPaused(round, "提交");
         if ("SUBMITTED".equals(round.getStatus())) {
             throw new BizException("回合已提交");
         }
@@ -166,6 +173,18 @@ public class RoundService {
     public Round require(Long id) {
         return roundRepository.findById(id)
                 .orElseThrow(() -> new BizException("回合不存在：id=" + id));
+    }
+
+    /** 写操作入口：悲观锁回合行，与安全联锁的暂停 / 恢复互斥 */
+    private Round requireForUpdate(Long id) {
+        return roundRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new BizException("回合不存在：id=" + id));
+    }
+
+    private static void rejectIfPaused(Round round, String action) {
+        if ("PAUSED".equals(round.getStatus())) {
+            throw new BizException("回合 [" + round.getRoundNo() + "] 因安全停射事件暂停，放行前不能" + action);
+        }
     }
 
     private void recalculate(Round round) {

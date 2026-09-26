@@ -65,10 +65,12 @@ public class LaneService {
 
     /**
      * 开台：只有「开放」的箭道能开台，按 单价 × 时长 × 会员折扣 预扣余额。
+     * 安全锁定的箭道禁止开台（锁行与联锁恢复互斥）。
      */
     @Transactional
     public LaneDtos.LaneView open(Long id, LaneDtos.LaneOpenReq req) {
-        Lane lane = require(id);
+        Lane lane = requireForUpdate(id);
+        rejectIfLocked(lane, "开台");
         if (!"OPEN".equals(lane.getStatus())) {
             throw new BizException("箭道 [" + lane.getLaneNo() + "] 当前为「"
                     + RangeDict.laneStatusName(lane.getStatus()) + "」，不能开台");
@@ -91,10 +93,11 @@ public class LaneService {
         return toView(laneRepository.save(lane));
     }
 
-    /** 收台：把占用中的箭道放回开放。 */
+    /** 收台：把占用中的箭道放回开放。安全锁定中禁止收台。 */
     @Transactional
     public LaneDtos.LaneView release(Long id) {
-        Lane lane = require(id);
+        Lane lane = requireForUpdate(id);
+        rejectIfLocked(lane, "收台");
         if (!"OCCUPIED".equals(lane.getStatus())) {
             throw new BizException("箭道 [" + lane.getLaneNo() + "] 当前无人占用，无需收台");
         }
@@ -106,10 +109,11 @@ public class LaneService {
         return toView(laneRepository.save(lane));
     }
 
-    /** 状态切换：开放 → 维护（保养）；维护 → 开放（修好）。占用中不允许改维护。 */
+    /** 状态切换：开放 → 维护（保养）；维护 → 开放（修好）。占用中不允许改维护；安全锁定中禁止变更。 */
     @Transactional
     public LaneDtos.LaneView setStatus(Long id, String status) {
-        Lane lane = require(id);
+        Lane lane = requireForUpdate(id);
+        rejectIfLocked(lane, "变更状态");
         if (!"OPEN".equals(status) && !"MAINTENANCE".equals(status)) {
             throw new BizException("只能手工切换到「开放」或「维护」状态");
         }
@@ -133,6 +137,18 @@ public class LaneService {
     public Lane require(Long id) {
         return laneRepository.findById(id)
                 .orElseThrow(() -> new BizException("箭道不存在：id=" + id));
+    }
+
+    /** 写操作入口：悲观锁箭道行，与安全联锁的锁定 / 恢复互斥 */
+    private Lane requireForUpdate(Long id) {
+        return laneRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new BizException("箭道不存在：id=" + id));
+    }
+
+    private static void rejectIfLocked(Lane lane, String action) {
+        if ("LOCKED".equals(lane.getStatus())) {
+            throw new BizException("箭道 [" + lane.getLaneNo() + "] 处于安全锁定（停射事件未放行），禁止" + action);
+        }
     }
 
     private static LaneDtos.LaneView toView(Lane lane) {

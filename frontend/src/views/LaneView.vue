@@ -17,11 +17,12 @@
       <div class="panel-title">
         靶场平面图
         <small>开放 <b class="c-open">{{ countOf('OPEN') }}</b> · 占用 <b class="c-busy">{{ countOf('OCCUPIED') }}</b> ·
-          维护 <b class="c-grey">{{ countOf('MAINTENANCE') }}</b></small>
+          维护 <b class="c-grey">{{ countOf('MAINTENANCE') }}</b> ·
+          锁定 <b class="c-lock">{{ countOf('LOCKED') }}</b></small>
       </div>
 
       <div class="rule-tip">
-        绿色 = 开放，可点开台；深青 = 占用中，可点收台；灰色 = 维护中，禁止开台。开台按「单价 × 时长 × 会员折扣」预扣余额。
+        绿色 = 开放，可点开台；深青 = 占用中，可点收台；灰色 = 维护中，禁止开台；红色 = 安全锁定（停射事件未放行，禁止开台与收台）。开台按「单价 × 时长 × 会员折扣」预扣余额。
       </div>
 
       <div class="hall">
@@ -64,6 +65,7 @@
         <span><i class="sw sw-open" />开放</span>
         <span><i class="sw sw-busy" />占用</span>
         <span><i class="sw sw-grey" />维护</span>
+        <span><i class="sw sw-lock" />安全锁定</span>
         <span class="muted">共 {{ lanes.length }} 条道</span>
       </div>
     </div>
@@ -165,6 +167,10 @@ async function loadMembers() {
 
 function pickLane(lane) {
   pickId.value = lane.id
+  if (lane.status === 'LOCKED') {
+    ElMessage.warning(`${lane.laneNo} 处于安全锁定，停射事件放行前禁止开台与收台`)
+    return
+  }
   if (lane.status === 'OPEN') {
     openForm.memberId = members.value.length ? members.value[0].id : null
     openForm.hours = 2
@@ -383,6 +389,20 @@ onMounted(async () => {
   opacity: 0.85;
 }
 
+.lane.is-locked .strip {
+  background: repeating-linear-gradient(180deg, #fde8e8 0 12px, #fbd9d9 12px 24px);
+  border-color: #f2b8b8;
+}
+
+.lane.is-locked .lane-status {
+  background: #c62828;
+  color: #fff;
+}
+
+.lane.is-locked {
+  cursor: not-allowed;
+}
+
 .legend {
   display: flex;
   align-items: center;
@@ -412,6 +432,10 @@ onMounted(async () => {
   background: #b6bfc3;
 }
 
+.sw-lock {
+  background: #c62828;
+}
+
 .c-open {
   color: #1f8a4c;
 }
@@ -422,6 +446,10 @@ onMounted(async () => {
 
 .c-grey {
   color: #8b9aa1;
+}
+
+.c-lock {
+  color: #c62828;
 }
 
 .dlg-tip {

@@ -21,7 +21,7 @@
             :key="l.id"
             :label="`${l.laneNo} · ${l.distance}m · ${l.statusName}`"
             :value="l.id"
-            :disabled="l.status === 'MAINTENANCE'"
+            :disabled="l.status === 'MAINTENANCE' || l.status === 'LOCKED'"
           />
         </el-select>
         <el-radio-group v-model="startForm.arrowCount">
@@ -72,12 +72,16 @@
             <div class="live-head">
               <div>
                 <span class="live-no mono">{{ current.round.roundNo }}</span>
-                <el-tag size="small" :type="current.round.status === 'SUBMITTED' ? 'success' : 'warning'" effect="dark">
+                <el-tag size="small" :type="roundTagType(current.round.status)" effect="dark">
                   {{ current.round.statusName }}
                 </el-tag>
                 <el-tag v-if="current.round.personalBest" size="small" type="danger" effect="dark">个人最好成绩</el-tag>
               </div>
               <div class="muted">{{ shortTime(current.round.startTime) }} · {{ current.round.distance }}米</div>
+            </div>
+
+            <div v-if="current.round.status === 'PAUSED'" class="pause-tip">
+              安全停射事件联锁中：本回合已暂停，已记箭支与分数保留，放行前不能记箭、撤销或提交。
             </div>
 
             <div class="progress-line">
@@ -156,7 +160,7 @@
         </el-table-column>
         <el-table-column label="状态" width="110">
           <template #default="{ row }">
-            <el-tag size="small" :type="row.status === 'SUBMITTED' ? 'success' : 'warning'" effect="plain">
+            <el-tag size="small" :type="roundTagType(row.status)" effect="plain">
               {{ row.statusName }}
             </el-tag>
           </template>
@@ -218,6 +222,12 @@ function chipClass(ring) {
   return ''
 }
 
+function roundTagType(status) {
+  if (status === 'SUBMITTED') return 'success'
+  if (status === 'PAUSED') return 'danger'
+  return 'warning'
+}
+
 function keyClass(ring) {
   return 'key-' + (ring === 'X' ? 'x' : ring === '10' ? 'ten' : ring === 'M' ? 'miss' : 'normal')
 }
@@ -230,7 +240,10 @@ async function loadBase() {
   members.value = await memberApi.options()
   const all = await laneApi.list()
   lanes.value = all
-  if (!startForm.laneId && all.length) startForm.laneId = all[0].id
+  if (!startForm.laneId && all.length) {
+    const usable = all.find((l) => l.status !== 'MAINTENANCE' && l.status !== 'LOCKED')
+    startForm.laneId = (usable || all[0]).id
+  }
   if (!startForm.memberId && members.value.length) startForm.memberId = members.value[0].id
 }
 
@@ -379,6 +392,17 @@ onMounted(async () => {
   justify-content: space-between;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.pause-tip {
+  margin-top: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #b3261e;
+  background: #fdecec;
+  border-left: 3px solid #c62828;
+  border-radius: 4px;
 }
 
 .live-no {

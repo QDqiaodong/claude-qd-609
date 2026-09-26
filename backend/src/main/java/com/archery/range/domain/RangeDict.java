@@ -19,7 +19,8 @@ public final class RangeDict {
     private static final Map<String, String> LANE_STATUS = Map.of(
             "OPEN", "开放",
             "OCCUPIED", "占用",
-            "MAINTENANCE", "维护");
+            "MAINTENANCE", "维护",
+            "LOCKED", "安全锁定");
 
     /** 开台单次时长上限（小时） */
     public static final int MAX_OPEN_HOURS = 8;
@@ -91,12 +92,62 @@ public final class RangeDict {
     private static final Map<String, String> EQUIP_STATUS = Map.of(
             "INSTOCK", "在库",
             "RENTED", "租出",
-            "REPAIR", "维修");
+            "REPAIR", "维修",
+            "LOCKED", "安全锁定");
 
     // ---------------- 回合状态 ----------------
     private static final Map<String, String> ROUND_STATUS = Map.of(
             "ONGOING", "进行中",
+            "PAUSED", "暂停中",
             "SUBMITTED", "已提交");
+
+    // ---------------- 安全停射联锁 ----------------
+    /** 停射事件状态机：待处置 → 分项复核 → 待放行 → 已放行（复核不通过退回待处置） */
+    private static final Map<String, String> SAFETY_STATUS = Map.of(
+            "PENDING", "待处置",
+            "REVIEWING", "分项复核",
+            "CLEARED", "待放行",
+            "RELEASED", "已放行");
+
+    /** 停射原因类别 */
+    private static final Map<String, String> SAFETY_REASON = Map.of(
+            "LANE_DEVICE", "箭道设备异常",
+            "PERSON_INTRUSION", "人员闯入射线",
+            "EQUIP_SUSPECT", "疑似器材故障",
+            "OTHER", "其他");
+
+    /** 严重级别 */
+    private static final Map<String, String> SAFETY_SEVERITY = Map.of(
+            "NOTICE", "一般",
+            "MAJOR", "严重",
+            "CRITICAL", "紧急");
+
+    /** 分项复核项：教练确认射线与人员安全；器材管理员确认器材已检查 */
+    private static final Map<String, String> REVIEW_ITEM = Map.of(
+            "RANGE", "射线与人员安全",
+            "EQUIPMENT", "器材检查");
+
+    /** 复核结论 */
+    private static final Map<String, String> CONCLUSION = Map.of(
+            "PASS", "通过",
+            "FAIL", "不通过");
+
+    /** 联锁台角色 */
+    private static final Map<String, String> SAFETY_ROLE = Map.of(
+            "MANAGER", "值班经理",
+            "COACH", "教练",
+            "KEEPER", "器材管理员",
+            "SYSTEM", "联锁系统");
+
+    /** 状态轨迹动作 */
+    private static final Map<String, String> SAFETY_ACTION = Map.of(
+            "CREATE", "建立停射事件",
+            "START_REVIEW", "发起分项复核",
+            "REVIEW_PASS", "复核通过",
+            "REVIEW_FAIL", "复核不通过",
+            "BACK_PENDING", "退回待处置",
+            "CLEARED", "两项复核均通过",
+            "RELEASE", "复射放行");
 
     // ---------------- 取值方法 ----------------
 
@@ -187,5 +238,55 @@ public final class RangeDict {
 
     public static String roundStatusName(String status) {
         return status == null ? "" : ROUND_STATUS.getOrDefault(status, status);
+    }
+
+    // ---------------- 安全停射联锁取值 ----------------
+
+    public static boolean isValidSafetyReason(String reason) {
+        return reason != null && SAFETY_REASON.containsKey(reason);
+    }
+
+    public static String safetyReasonName(String reason) {
+        return reason == null ? "" : SAFETY_REASON.getOrDefault(reason, reason);
+    }
+
+    public static boolean isValidSafetySeverity(String severity) {
+        return severity != null && SAFETY_SEVERITY.containsKey(severity);
+    }
+
+    public static String safetySeverityName(String severity) {
+        return severity == null ? "" : SAFETY_SEVERITY.getOrDefault(severity, severity);
+    }
+
+    public static String safetyStatusName(String status) {
+        return status == null ? "" : SAFETY_STATUS.getOrDefault(status, status);
+    }
+
+    public static boolean isValidReviewItem(String item) {
+        return item != null && REVIEW_ITEM.containsKey(item);
+    }
+
+    public static String reviewItemName(String item) {
+        return item == null ? "" : REVIEW_ITEM.getOrDefault(item, item);
+    }
+
+    public static boolean isValidConclusion(String conclusion) {
+        return conclusion != null && CONCLUSION.containsKey(conclusion);
+    }
+
+    public static String conclusionName(String conclusion) {
+        return conclusion == null ? "" : CONCLUSION.getOrDefault(conclusion, conclusion);
+    }
+
+    public static boolean isValidSafetyRole(String role) {
+        return role != null && SAFETY_ROLE.containsKey(role);
+    }
+
+    public static String safetyRoleName(String role) {
+        return role == null ? "" : SAFETY_ROLE.getOrDefault(role, role);
+    }
+
+    public static String safetyActionName(String action) {
+        return action == null ? "" : SAFETY_ACTION.getOrDefault(action, action);
     }
 }

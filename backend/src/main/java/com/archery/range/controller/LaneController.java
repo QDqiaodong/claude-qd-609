@@ -79,7 +79,8 @@ public class LaneController {
         options.put("statuses", List.of(
                 Map.of("code", "OPEN", "name", RangeDict.laneStatusName("OPEN")),
                 Map.of("code", "OCCUPIED", "name", RangeDict.laneStatusName("OCCUPIED")),
-                Map.of("code", "MAINTENANCE", "name", RangeDict.laneStatusName("MAINTENANCE"))));
+                Map.of("code", "MAINTENANCE", "name", RangeDict.laneStatusName("MAINTENANCE")),
+                Map.of("code", "LOCKED", "name", RangeDict.laneStatusName("LOCKED"))));
         options.put("maxOpenHours", RangeDict.MAX_OPEN_HOURS);
         return ApiResponse.success(options);
     }
